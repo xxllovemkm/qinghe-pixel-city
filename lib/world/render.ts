@@ -128,7 +128,7 @@ function road(
       rect(c, x + w / 2 - 1, a, 2, 16, '#d0c9a1');
   }
 }
-export function renderGround(c: C, world: World) {
+export function renderGround(c: C, world: World, flatDetails = true) {
   c.imageSmoothingEnabled = false;
   rect(c, 0, 0, W, H, '#8daf6d');
   const random = rng(world.seed);
@@ -201,14 +201,14 @@ export function renderGround(c: C, world: World) {
   pitch(c, 723, 965, 211, 63, true);
   rect(c, 1927, 749, 29, 682, '#d7cdad');
   rect(c, 1815, 1070, 298, 25, '#d7cdad');
-  fountain(c, 1940, 1020);
+  if (flatDetails) fountain(c, 1940, 1020);
   pitch(c, 1840, 1342, 240, 68, true);
   for (let i = 0; i < 4; i++) {
-    bench(c, 1820 + i * 83, 1125);
+    if (flatDetails) bench(c, 1820 + i * 83, 1125);
     flowerbed(c, 1822 + i * 82, 1148, 35);
   }
   rect(c, 1098, 550, 176, 48, '#d4cbae');
-  fountain(c, 1185, 575);
+  if (flatDetails) fountain(c, 1185, 575);
   // Roads remain connected across all four bridges.
   for (const x of ROAD_X) road(c, x - 23, 42, 46, H - 90, false);
   for (const y of ROAD_Y) road(c, 55, y - 23, W - 110, 46, true);
@@ -243,41 +243,44 @@ export function renderGround(c: C, world: World) {
   for (let y = 90; y < H - 40; y += 80) {
     const x = riverX(y) + 140;
     if (!isRoad(x, y, 40)) {
-      bench(c, x, y);
+      if (flatDetails) bench(c, x, y);
       flowerbed(c, x + 5, y + 24, 25);
     }
   }
-  for (const y of ROAD_Y)
-    for (let x = 100; x < W - 60; x += 140) {
-      if (isWater(x, y) || ROAD_X.some((rx) => Math.abs(rx - x) < 60)) continue;
-      rect(c, x + 3, y - 58, 7, 31, '#647260');
-      rect(c, x, y - 63, 12, 8, '#eee4ad');
-      rect(c, x + 4, y - 58, 3, 30, '#e0d9b3');
-    }
+  if (flatDetails)
+    for (const y of ROAD_Y)
+      for (let x = 100; x < W - 60; x += 140) {
+        if (isWater(x, y) || ROAD_X.some((rx) => Math.abs(rx - x) < 60))
+          continue;
+        rect(c, x + 3, y - 58, 7, 31, '#647260');
+        rect(c, x, y - 63, 12, 8, '#eee4ad');
+        rect(c, x + 4, y - 58, 3, 30, '#e0d9b3');
+      }
   // Small sailboats are part of the world, with water kept open below them.
-  for (const y of [420, 970, 1300]) {
-    const x = riverX(y);
-    poly(
-      c,
-      [
-        [x - 16, y],
-        [x + 17, y],
-        [x + 9, y + 13],
-        [x - 7, y + 13],
-      ],
-      '#e7d7ad',
-    );
-    rect(c, x, y - 28, 3, 35, '#755f48');
-    poly(
-      c,
-      [
-        [x + 4, y - 26],
-        [x + 4, y - 2],
-        [x + 22, y - 2],
-      ],
-      '#f1e7cc',
-    );
-  }
+  if (flatDetails)
+    for (const y of [420, 970, 1300]) {
+      const x = riverX(y);
+      poly(
+        c,
+        [
+          [x - 16, y],
+          [x + 17, y],
+          [x + 9, y + 13],
+          [x - 7, y + 13],
+        ],
+        '#e7d7ad',
+      );
+      rect(c, x, y - 28, 3, 35, '#755f48');
+      poly(
+        c,
+        [
+          [x + 4, y - 26],
+          [x + 4, y - 2],
+          [x + 22, y - 2],
+        ],
+        '#f1e7cc',
+      );
+    }
 }
 export function drawBuilding(c: C, b: Building) {
   const { x, y, w, h, height: z, color: v } = b;

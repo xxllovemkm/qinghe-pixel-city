@@ -1033,3 +1033,51 @@ kbd {
     transition: none !important;
   }
 }
+
+.world-labels {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.render-error {
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100% - 32px));
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+.render-error p {
+  line-height: 1.8;
+}
+.render-error button {
+  background: #e5c58b;
+  color: #233c3b;
+  padding: 12px 20px;
+  border-radius: 5px;
+}
+.world-view {
+  background: #b5cfcb;
+}
+.compass-mark {
+  color: #2d4c48;
+}
+@media (max-height: 650px) {
+  .side-tools {
+    flex-direction: row;
+    top: 165px;
+  }
+  .layers-panel,
+  .help-panel {
+    top: 212px;
+    left: 22px;
+  }
+}

@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Building2,
+  RotateCcw,
+  RotateCw,
   School,
   TreePine,
   MousePointer2,
@@ -41,36 +43,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import {
-  W,
-  H,
-  TYPE_NAMES,
-  createWorld,
-  updateAgents,
-  place,
-  riverX,
-  type World,
-  type Tool,
-  type Building,
-} from '@/lib/world/model';
-import { registerCityTools } from '@/lib/world/agent-tools';
-import {
-  renderGround,
-  renderObjects,
-  drawAgents,
-  drawNight,
-  drawBuilding,
-  drawTree,
-} from '@/lib/world/render';
-type Camera = { x: number; y: number; zoom: number };
-type Engine = {
-  world: World;
-  camera: Camera;
-  refresh: () => void;
-  focus: (b?: Building) => void;
-  zoom: (v: number) => void;
-  edit: (tool: Tool, x: number, y: number) => string;
-};
+import { type Tool, type Building, TYPE_NAMES } from '@/lib/world/model';
+import { createCity3D, type City3DEngine } from '@/lib/world/scene3d';
 const places = [
   { name: '青禾小学', sub: '启蒙与成长', color: '#efb961', icon: School },
   { name: '明德初中', sub: '探索更大的世界', color: '#80b9d2', icon: School },
@@ -119,7 +93,9 @@ function IconButton({
 export default function City() {
   const canvasRef = useRef<HTMLCanvasElement>(null),
     miniRef = useRef<HTMLCanvasElement>(null),
-    engine = useRef<Engine | null>(null);
+    overlayRef = useRef<HTMLCanvasElement>(null),
+    engine = useRef<City3DEngine | null>(null);
+  const [renderError, setRenderError] = useState('');
   const [tool, setTool] = useState<Tool>('explore'),
     [paused, setPaused] = useState(false),
     [speed, setSpeed] = useState(1),
@@ -145,381 +121,30 @@ export default function City() {
     toastTimer.current = setTimeout(() => setToast(''), 3200);
   }, []);
   useEffect(() => {
-    const canvas = canvasRef.current!,
-      mini = miniRef.current!,
-      ctx = canvas.getContext('2d')!,
-      mc = mini.getContext('2d')!;
-    const world = createWorld();
-    const cached = document.createElement('canvas');
-    cached.width = W;
-    cached.height = H;
-    const bg = cached.getContext('2d')!;
-    const buildings = document.createElement('canvas');
-    buildings.width = W;
-    buildings.height = H;
-    const objects = buildings.getContext('2d')!;
-    let width = 1,
-      height = 1,
-      baseZoom = 1,
-      raf = 0,
-      last = performance.now(),
-      elapsed = 0,
-      time = 8 * 60 + 30,
-      uiTimer = 0,
-      drag: {
-        x: number;
-        y: number;
-        cx: number;
-        cy: number;
-        distance: number;
-        id: number;
-      } | null = null,
-      hover: { x: number; y: number } | null = null;
-    const camera: Camera = { x: W / 2, y: H / 2, zoom: 1 };
-    function updateStats() {
-      setStats({
-        population: world.buildings
-          .filter((b) => b.kind === 'home')
-          .reduce((n, b) => n + b.people, 0),
-        trees: world.trees.length,
-        buildings: world.buildings.length,
+    try {
+      engine.current = createCity3D({
+        canvas: canvasRef.current!,
+        mini: miniRef.current!,
+        overlay: overlayRef.current!,
+        options: () => live.current,
+        announce,
+        onSelect: setSelected,
+        onClock: setClock,
+        onZoom: setZoom,
+        onCoords: setCoords,
+        onStats: setStats,
+        onPause: () => setPaused((v) => !v),
+        onTool: setTool,
+        onError: setRenderError,
       });
-    }
-    function refresh() {
-      bg.clearRect(0, 0, W, H);
-      objects.clearRect(0, 0, W, H);
-      renderGround(bg, world);
-      renderObjects(objects, world);
-      updateStats();
-    }
-    const clamp = () => {
-      camera.zoom = Math.max(baseZoom * 0.72, Math.min(2.8, camera.zoom));
-      camera.x = Math.max(0, Math.min(W, camera.x));
-      camera.y = Math.max(0, Math.min(H, camera.y));
-      setZoom(Math.round((camera.zoom / baseZoom) * 100));
-    };
-    const changeZoom = (factor: number) => {
-      camera.zoom *= factor;
-      clamp();
-    };
-    function focus(b?: Building) {
-      if (b) {
-        camera.x = b.x + b.w / 2;
-        camera.y = b.y + b.h / 2;
-        camera.zoom = Math.max(baseZoom * 2.3, 0.95);
-        setSelected(b);
-      } else {
-        camera.x = W / 2;
-        camera.y = H / 2;
-        camera.zoom = baseZoom;
-      }
-      clamp();
-    }
-    function resize() {
-      const box = canvas.getBoundingClientRect();
-      width = box.width;
-      height = box.height;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      const previous = baseZoom;
-      baseZoom = Math.min(width / W, height / H) * 1.08;
-      camera.zoom *= baseZoom / previous;
-      clamp();
-    }
-    const local = (e: { clientX: number; clientY: number }) => {
-      const box = canvas.getBoundingClientRect();
-      return {
-        x: (e.clientX - box.left - width / 2) / camera.zoom + camera.x,
-        y: (e.clientY - box.top - height / 2) / camera.zoom + camera.y,
-      };
-    };
-    const edit = (t: Tool, x: number, y: number) => {
-      const result = place(world, t, x, y);
-      refresh();
-      announce(result);
-      return result;
-    };
-    engine.current = { world, camera, refresh, focus, zoom: changeZoom, edit };
-    const unregisterTools = registerCityTools(world, edit);
-    const down = (e: PointerEvent) => {
-      if (e.button !== 0 && e.button !== 1) return;
-      canvas.focus();
-      canvas.setPointerCapture(e.pointerId);
-      drag = {
-        x: e.clientX,
-        y: e.clientY,
-        cx: camera.x,
-        cy: camera.y,
-        distance: 0,
-        id: e.pointerId,
-      };
-    };
-    const move = (e: PointerEvent) => {
-      hover = local(e);
-      setCoords({ x: Math.round(hover.x), y: Math.round(hover.y) });
-      if (drag && drag.id === e.pointerId) {
-        const dx = e.clientX - drag.x,
-          dy = e.clientY - drag.y;
-        drag.distance = Math.max(drag.distance, Math.hypot(dx, dy));
-        camera.x = drag.cx - dx / camera.zoom;
-        camera.y = drag.cy - dy / camera.zoom;
-        clamp();
-      }
-    };
-    const up = (e: PointerEvent) => {
-      if (!drag || drag.id !== e.pointerId) return;
-      const distance = drag.distance;
-      drag = null;
-      canvas.releasePointerCapture(e.pointerId);
-      if (distance > 5) return;
-      const p = local(e);
-      if (live.current.tool === 'explore') {
-        const b = [...world.buildings]
-          .reverse()
-          .find(
-            (b) =>
-              p.x >= b.x - 7 &&
-              p.x <= b.x + b.w + 7 &&
-              p.y >= b.y - b.height - 30 &&
-              p.y <= b.y + b.h + 8,
-          );
-        if (b) setSelected(b);
-      } else edit(live.current.tool, p.x, p.y);
-    };
-    const cancel = () => {
-      drag = null;
-    };
-    const wheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const p = local(e);
-      changeZoom(e.deltaY > 0 ? 0.9 : 1.1);
-      const after = local(e);
-      camera.x += p.x - after.x;
-      camera.y += p.y - after.y;
-      clamp();
-    };
-    const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest('button,input,[role="dialog"]'))
-        return;
-      const d = 70 / camera.zoom;
-      switch (e.key.toLowerCase()) {
-        case ' ':
-          e.preventDefault();
-          setPaused((v) => !v);
-          break;
-        case 'w':
-        case 'arrowup':
-          e.preventDefault();
-          camera.y -= d;
-          break;
-        case 's':
-        case 'arrowdown':
-          e.preventDefault();
-          camera.y += d;
-          break;
-        case 'a':
-        case 'arrowleft':
-          e.preventDefault();
-          camera.x -= d;
-          break;
-        case 'd':
-        case 'arrowright':
-          e.preventDefault();
-          camera.x += d;
-          break;
-        case '+':
-        case '=':
-          changeZoom(1.2);
-          break;
-        case '-':
-          changeZoom(1 / 1.2);
-          break;
-        case '1':
-          setTool('explore');
-          break;
-        case '2':
-          setTool('tree');
-          break;
-        case '3':
-          setTool('home');
-          break;
-        case '4':
-          setTool('erase');
-          break;
-        case 'escape':
-          setTool('explore');
-          break;
-        case '0':
-          focus();
-          break;
-      }
-      clamp();
-    };
-    const miniMove = (e: PointerEvent) => {
-      const r = mini.getBoundingClientRect();
-      camera.x = ((e.clientX - r.left) / r.width) * W;
-      camera.y = ((e.clientY - r.top) / r.height) * H;
-      clamp();
-    };
-    canvas.addEventListener('pointerdown', down);
-    canvas.addEventListener('pointermove', move);
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', cancel);
-    canvas.addEventListener('wheel', wheel, { passive: false });
-    window.addEventListener('keydown', key);
-    mini.addEventListener('pointerdown', miniMove);
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    refresh();
-    resize();
-    function label(text: string, x: number, y: number, color = '#f0e5c7') {
-      ctx.font = '600 13px "PingFang SC", "Microsoft YaHei", sans-serif';
-      const screenX = (x - camera.x) * camera.zoom + width / 2,
-        screenY = (y - camera.y) * camera.zoom + height / 2;
-      const tw = ctx.measureText(text).width;
-      if (screenX < 0 || screenX > width || screenY < 0 || screenY > height)
-        return;
-      ctx.fillStyle = '#223c39db';
-      ctx.fillRect(screenX - tw / 2 - 10, screenY - 11, tw + 20, 25);
-      ctx.fillStyle = color;
-      ctx.textAlign = 'center';
-      ctx.fillText(text, screenX, screenY + 6);
-    }
-    function frame(now: number) {
-      const dt = Math.min((now - last) / 1000, 0.06);
-      last = now;
-      const opts = live.current;
-      if (!opts.paused) {
-        const simDt = dt * opts.speed;
-        elapsed += simDt;
-        time += simDt * 2;
-        updateAgents(world, simDt);
-      }
-      const dpr = canvas.width / width;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = '#6f9560';
-      ctx.fillRect(0, 0, width, height);
-      ctx.save();
-      ctx.translate(
-        Math.round(width / 2 - camera.x * camera.zoom),
-        Math.round(height / 2 - camera.y * camera.zoom),
+    } catch (error) {
+      console.error('3D city could not start', error);
+      setRenderError(
+        '无法启动 3D 画面，请在支持 WebGL 2 的浏览器中启用硬件加速后重新加载。',
       );
-      ctx.scale(camera.zoom, camera.zoom);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(cached, 0, 0);
-      drawAgents(ctx, world, elapsed);
-      ctx.drawImage(buildings, 0, 0);
-      const hour = (time / 60) % 24;
-      const dusk = opts.night
-        ? 1
-        : hour >= 19 || hour < 5
-          ? 1
-          : hour >= 17
-            ? (hour - 17) / 2
-            : hour < 7
-              ? (7 - hour) / 2
-              : 0;
-      drawNight(ctx, world, dusk);
-      if (opts.grid) {
-        ctx.strokeStyle = '#edf4c330';
-        ctx.lineWidth = 1 / camera.zoom;
-        ctx.beginPath();
-        for (let x = 0; x < W; x += 32) {
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, H);
-        }
-        for (let y = 0; y < H; y += 32) {
-          ctx.moveTo(0, y);
-          ctx.lineTo(W, y);
-        }
-        ctx.stroke();
-      }
-      if (hover && opts.tool !== 'explore') {
-        ctx.globalAlpha = 0.58;
-        if (opts.tool === 'home')
-          drawBuilding(ctx, {
-            id: 'ghost',
-            name: '',
-            kind: 'home',
-            x: Math.round(hover.x / 8) * 8 - 36,
-            y: Math.round(hover.y / 8) * 8 - 28,
-            w: 72,
-            h: 56,
-            height: 36,
-            color: 2,
-            people: 4,
-          });
-        else if (opts.tool === 'tree')
-          drawTree(ctx, { x: hover.x, y: hover.y, variant: 0 });
-        else {
-          ctx.strokeStyle = '#ed907a';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(hover.x - 20, hover.y - 20, 40, 40);
-        }
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-      if (opts.labels) {
-        world.buildings
-          .filter((b) => b.kind !== 'home' && b.kind !== 'shop')
-          .forEach((b) =>
-            label(
-              b.name,
-              b.x + b.w / 2,
-              b.y + b.h + 33,
-              ['primary', 'middle', 'high', 'university'].includes(b.kind)
-                ? '#efd299'
-                : '#e1ead8',
-            ),
-          );
-        label('梧 桐 里', 408, 620);
-        label('东 岸 花 园', 1960, 620);
-        label('青 禾 社 区', 410, 1408);
-        label('青 河', riverX(750), 752, '#a4dadd');
-      }
-      mc.imageSmoothingEnabled = false;
-      mc.clearRect(0, 0, mini.width, mini.height);
-      mc.drawImage(cached, 0, 0, mini.width, mini.height);
-      mc.drawImage(buildings, 0, 0, mini.width, mini.height);
-      mc.fillStyle = '#132b363d';
-      mc.fillRect(0, 0, mini.width, mini.height);
-      mc.strokeStyle = '#f5d58c';
-      mc.lineWidth = 2;
-      const vw = (width / camera.zoom / W) * mini.width,
-        vh = (height / camera.zoom / H) * mini.height;
-      mc.strokeRect(
-        (camera.x / W) * mini.width - vw / 2,
-        (camera.y / H) * mini.height - vh / 2,
-        vw,
-        vh,
-      );
-      mc.fillStyle = '#f2d08b';
-      mc.fillRect(
-        (camera.x / W) * mini.width - 2,
-        (camera.y / H) * mini.height - 2,
-        4,
-        4,
-      );
-      uiTimer += dt;
-      if (uiTimer > 0.4) {
-        setClock(Math.floor(time));
-        uiTimer = 0;
-      }
-      raf = requestAnimationFrame(frame);
     }
-    raf = requestAnimationFrame(frame);
     return () => {
-      unregisterTools();
-      cancelAnimationFrame(raf);
-      observer.disconnect();
-      canvas.removeEventListener('pointerdown', down);
-      canvas.removeEventListener('pointermove', move);
-      canvas.removeEventListener('pointerup', up);
-      canvas.removeEventListener('pointercancel', cancel);
-      canvas.removeEventListener('wheel', wheel);
-      window.removeEventListener('keydown', key);
-      mini.removeEventListener('pointerdown', miniMove);
+      engine.current?.dispose();
       engine.current = null;
       clearTimeout(toastTimer.current);
     };
@@ -543,12 +168,12 @@ export default function City() {
               <h1>
                 青河市<span>QINGHE</span>
               </h1>
-              <p>像素世界 · 自由沙盒</p>
+              <p>3D 体素世界 · 自由沙盒</p>
             </div>
           </div>
           <div className="world-badge">
             <span className="status-dot" />
-            世界正在发生
+            立体城市 · 360° 漫游
             <span className="tiny-divider" />
             种子 2417
           </div>
@@ -578,9 +203,23 @@ export default function City() {
           <canvas
             ref={canvasRef}
             className={`world-canvas ${tool !== 'explore' ? 'building-cursor' : ''}`}
-            aria-label="像素城市地图。拖动平移，滚轮缩放。使用数字 1 到 4 选择工具，方向键移动。"
+            aria-label="立体像素城市。左键拖动旋转，右键拖动平移，滚轮缩放。Q/E 旋转，R/F 俯仰，WASD 移动。"
             tabIndex={0}
           />
+          <canvas
+            ref={overlayRef}
+            className="world-labels"
+            aria-hidden="true"
+          />
+          {renderError && (
+            <div className="render-error panel" role="alert">
+              <Building2 size={32} />
+              <p>{renderError}</p>
+              <button onClick={() => window.location.reload()}>
+                重新加载 3D 世界
+              </button>
+            </div>
+          )}
           <aside className="city-overview panel">
             <div className="eyebrow">
               <span className="status-dot" />
@@ -642,6 +281,18 @@ export default function City() {
             >
               {night ? <Moon size={20} /> : <Sun size={20} />}
             </IconButton>
+            <IconButton
+              label="向左旋转 · Q"
+              onClick={() => engine.current?.orbit(Math.PI / 8)}
+            >
+              <RotateCcw size={20} />
+            </IconButton>
+            <IconButton
+              label="向右旋转 · E"
+              onClick={() => engine.current?.orbit(-Math.PI / 8)}
+            >
+              <RotateCw size={20} />
+            </IconButton>
             <div className="tool-divider" />
             <IconButton
               label="操作指南"
@@ -697,9 +348,9 @@ export default function City() {
                 </button>
               </div>
               <p>
-                拖动地图平移，滚轮缩放。
+                左键拖动旋转，右键拖动平移。
                 <br />
-                触屏可单指拖动，用 ＋ / − 缩放。
+                滚轮缩放；触屏单指旋转、双指缩放平移。
                 <br />
                 点击建筑查看详情。
                 <br />
@@ -708,6 +359,14 @@ export default function City() {
               <div className="key-row">
                 <kbd>W A S D</kbd>
                 <span>移动视野</span>
+              </div>
+              <div className="key-row">
+                <kbd>Q / E</kbd>
+                <span>左右旋转</span>
+              </div>
+              <div className="key-row">
+                <kbd>R / F</kbd>
+                <span>调整俯仰</span>
               </div>
               <div className="key-row">
                 <kbd>空格</kbd>
@@ -741,7 +400,7 @@ export default function City() {
                 role="img"
               />
               <div className="minimap-foot">
-                <span>青河 · 全域地图</span>
+                <span>青河 · 镜头范围</span>
                 <span>点击定位</span>
               </div>
             </div>
@@ -773,7 +432,7 @@ export default function City() {
               ))}
               <div className="places-footer">
                 <MapPin size={12} />
-                点击学校，前往校园
+                点击学校，近看立体校园
               </div>
             </div>
           </aside>
@@ -805,11 +464,11 @@ export default function City() {
             <div className="tool-hint">
               <Move size={13} />
               {tool === 'explore'
-                ? '拖动探索 · 滚轮缩放 · 点击建筑'
+                ? '左键旋转 · 右键平移 · 滚轮缩放'
                 : tool === 'tree'
-                  ? '点击空地种树 · 拖动移动视野'
+                  ? '点击空地种树 · 拖动旋转视角'
                   : tool === 'home'
-                    ? '点击空地建造住宅 · 拖动移动视野'
+                    ? '点击空地建住宅 · 拖动旋转视角'
                     : '点击移除你放置的房屋或树木'}
             </div>
             <div className="build-tools panel">
@@ -884,7 +543,7 @@ export default function City() {
             X {coords.x.toString().padStart(4, '0')}
             <span>Y {coords.y.toString().padStart(4, '0')}</span>
           </span>
-          <span>每一个像素，都有生活。</span>
+          <span>3D 体素城市 · 自由视角</span>
         </footer>
         <Sheet
           open={!!selected}
