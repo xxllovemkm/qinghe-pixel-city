@@ -66,7 +66,7 @@ type Voxel = {
   color: string;
   id?: string;
 };
-class Voxels {
+export class Voxels {
   parts: Voxel[] = [];
   glow: Voxel[] = [];
   box(

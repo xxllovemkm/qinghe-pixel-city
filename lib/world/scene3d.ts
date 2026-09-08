@@ -8,6 +8,7 @@ import {
   place,
   type Tool,
   type Building,
+  type World,
 } from './model';
 import { renderGround, renderObjects } from './render';
 import {
@@ -31,6 +32,7 @@ export type ViewOptions = {
   night: boolean;
 };
 type Setup = {
+  saved?: CitySnapshot;
   canvas: HTMLCanvasElement;
   mini: HTMLCanvasElement;
   overlay: HTMLCanvasElement;
@@ -49,9 +51,16 @@ type Setup = {
   onTool: (t: Tool) => void;
   onError: (message: string) => void;
 };
+export type CitySnapshot = {
+  world: World;
+  time: number;
+  elapsed: number;
+  position: [number, number, number];
+  target: [number, number, number];
+};
 export function createCity3D(config: Setup) {
   const { canvas, mini, overlay } = config;
-  const world = createWorld();
+  const world = config.saved?.world ?? createWorld();
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: false,
@@ -60,7 +69,7 @@ export function createCity3D(config: Setup) {
   });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -152,8 +161,8 @@ export function createCity3D(config: Setup) {
     baseDistance = 320,
     raf = 0,
     last = performance.now(),
-    time = 510,
-    elapsed = 0,
+    time = config.saved?.time ?? 510,
+    elapsed = config.saved?.elapsed ?? 0,
     uiTime = 0,
     miniTime = 0,
     hover: { x: number; y: number } | null = null,
@@ -438,6 +447,12 @@ export function createCity3D(config: Setup) {
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
+  if (config.saved) {
+    camera.position.fromArray(config.saved.position);
+    controls.target.fromArray(config.saved.target);
+    controls.update();
+  }
+  config.onClock(Math.floor(time));
   controls.update();
   const unregister = registerCityTools(world, edit);
   function drawMini() {
@@ -582,6 +597,8 @@ export function createCity3D(config: Setup) {
       ghostMaterial.color.set(opts.tool === 'erase' ? '#ef8e77' : '#edce91');
     }
     renderer.render(scene, camera);
+    canvas.dataset.scene = 'city';
+    canvas.dataset.ready = 'true';
     drawLabels(opts.labels);
     miniTime += dt;
     uiTime += dt;
@@ -610,6 +627,13 @@ export function createCity3D(config: Setup) {
     orbit,
     refresh,
     edit,
+    snapshot: (): CitySnapshot => ({
+      world,
+      time,
+      elapsed,
+      position: camera.position.toArray(),
+      target: controls.target.toArray(),
+    }),
     dispose: () => {
       disposed = true;
       cancelAnimationFrame(raf);
@@ -630,6 +654,7 @@ export function createCity3D(config: Setup) {
       (backdrop.material as THREE.Material).dispose();
       sun.shadow.map?.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
     },
   };
 }

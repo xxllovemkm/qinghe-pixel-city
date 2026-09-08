@@ -28,6 +28,9 @@ import {
   Trash2,
   Navigation,
   Check,
+  ArrowLeft,
+  DoorOpen,
+  Armchair,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -44,7 +47,23 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { type Tool, type Building, TYPE_NAMES } from '@/lib/world/model';
-import { createCity3D, type City3DEngine } from '@/lib/world/scene3d';
+import {
+  createCity3D,
+  type City3DEngine,
+  type CitySnapshot,
+} from '@/lib/world/scene3d';
+import {
+  createCampus,
+  isSchoolKind,
+  type Campus,
+  type Facility,
+} from '@/lib/world/school-model';
+import {
+  createSchool3D,
+  SCHOOL_META,
+  type School3DEngine,
+  type SchoolKind,
+} from '@/lib/world/school3d';
 const places = [
   { name: '青禾小学', sub: '启蒙与成长', color: '#efb961', icon: School },
   { name: '明德初中', sub: '探索更大的世界', color: '#80b9d2', icon: School },
@@ -94,8 +113,15 @@ export default function City() {
   const canvasRef = useRef<HTMLCanvasElement>(null),
     miniRef = useRef<HTMLCanvasElement>(null),
     overlayRef = useRef<HTMLCanvasElement>(null),
-    engine = useRef<City3DEngine | null>(null);
+    engine = useRef<City3DEngine | null>(null),
+    schoolEngine = useRef<School3DEngine | null>(null);
   const [renderError, setRenderError] = useState('');
+  const [view, setView] = useState<'city' | 'school'>('city');
+  const [campusKind, setCampusKind] = useState<SchoolKind | null>(null);
+  const [facility, setFacility] = useState<Facility | null>(null);
+  const [directory, setDirectory] = useState(false);
+  const campusCache = useRef<Partial<Record<SchoolKind, Campus>>>({});
+  const savedCity = useRef<CitySnapshot | undefined>(undefined);
   const [tool, setTool] = useState<Tool>('explore'),
     [paused, setPaused] = useState(false),
     [speed, setSpeed] = useState(1),
@@ -121,8 +147,38 @@ export default function City() {
     toastTimer.current = setTimeout(() => setToast(''), 3200);
   }, []);
   useEffect(() => {
+    if (view === 'school' && campusKind) {
+      try {
+        const campus = (campusCache.current[campusKind] ??=
+          createCampus(campusKind));
+        schoolEngine.current = createSchool3D({
+          canvas: canvasRef.current!,
+          mini: miniRef.current!,
+          overlay: overlayRef.current!,
+          campus,
+          options: () => live.current,
+          onClock: setClock,
+          onZoom: setZoom,
+          onCoords: setCoords,
+          onError: setRenderError,
+          announce,
+          onSelect: setFacility,
+          onStats: setStats,
+          onPause: () => setPaused((v) => !v),
+          onTool: setTool,
+        });
+      } catch (error) {
+        console.error('school 3D could not start', error);
+        setRenderError('无法启动校园 3D 画面，请重新加载。');
+      }
+      return () => {
+        schoolEngine.current?.dispose();
+        schoolEngine.current = null;
+      };
+    }
     try {
       engine.current = createCity3D({
+        saved: savedCity.current,
         canvas: canvasRef.current!,
         mini: miniRef.current!,
         overlay: overlayRef.current!,
@@ -144,21 +200,62 @@ export default function City() {
       );
     }
     return () => {
+      savedCity.current = engine.current?.snapshot();
       engine.current?.dispose();
       engine.current = null;
       clearTimeout(toastTimer.current);
     };
-  }, [announce]);
+  }, [announce, campusKind, view]);
   const focusPlace = (name: string) => {
     const b = engine.current?.world.buildings.find((b) => b.name === name);
     if (b) engine.current?.focus(b);
   };
+  const rotate = (angle: number, tilt = 0) =>
+    view === 'city'
+      ? engine.current?.orbit(angle, tilt)
+      : schoolEngine.current?.orbit(angle, tilt);
+  const zoomView = (factor: number) =>
+    view === 'city'
+      ? engine.current?.zoom(factor)
+      : schoolEngine.current?.zoom(factor);
+  const enterCampus = (kind: SchoolKind) => {
+    clearTimeout(toastTimer.current);
+    setToast('');
+    setSelected(null);
+    setRenderError('');
+    setCampusKind(kind);
+    setView('school');
+    setTool('explore');
+    setFacility(null);
+    setDirectory(false);
+    setHelp(false);
+    setLayers(false);
+  };
+  const exitCampus = () => {
+    setView('city');
+    setCampusKind(null);
+    setRenderError('');
+    setFacility(null);
+    setSelected(null);
+    setTool('explore');
+    setDirectory(false);
+    announce('已返回青河市');
+  };
+  const overview = () =>
+    view === 'city' ? engine.current?.focus() : schoolEngine.current?.focus();
+  const campusMeta = campusKind ? SCHOOL_META[campusKind] : null;
+  const facilityList = campusKind
+    ? (campusCache.current[campusKind]?.facilities ?? [])
+    : [];
   const h = Math.floor(clock / 60) % 24,
     m = clock % 60,
     isDark = night || h >= 19 || h < 6;
   return (
     <TooltipProvider delay={200}>
-      <main className="city-app">
+      <main
+        className={`city-app ${view === 'school' ? 'campus-app' : ''}`}
+        data-view={campusKind ?? 'city'}
+      >
         <header className="topbar">
           <div className="brand">
             <div className="brand-icon">
@@ -166,18 +263,31 @@ export default function City() {
             </div>
             <div>
               <h1>
-                青河市<span>QINGHE</span>
+                {campusMeta?.name ?? '青河市'}
+                <span>{campusMeta ? 'CAMPUS' : 'QINGHE'}</span>
               </h1>
-              <p>3D 体素世界 · 自由沙盒</p>
+              <p>
+                {campusMeta
+                  ? `青河市 · ${campusMeta.level}校园`
+                  : '3D 体素世界 · 自由沙盒'}
+              </p>
             </div>
           </div>
           <div className="world-badge">
             <span className="status-dot" />
-            立体城市 · 360° 漫游
+            {campusMeta
+              ? `${facilityList.length} 处教学与生活设施`
+              : '立体城市 · 360° 漫游'}
             <span className="tiny-divider" />
-            种子 2417
+            {campusMeta ? `规划容量 ${campusMeta.capacity} 人` : '种子 2417'}
           </div>
           <div className="top-actions">
+            {view === 'school' && (
+              <button className="return-city" onClick={exitCampus}>
+                <ArrowLeft size={17} />
+                <span>返回青河市</span>
+              </button>
+            )}
             <span className="weather">
               {isDark ? <Moon size={18} /> : <Sun size={18} />}
               <span>{isDark ? '晴朗夜空' : '晴 · 微风'}</span>
@@ -188,7 +298,9 @@ export default function City() {
                 setTool(tool === 'explore' ? 'home' : 'explore');
                 announce(
                   tool === 'explore'
-                    ? '选择空地，放置你的第一栋住宅'
+                    ? campusMeta
+                      ? '选择空地放置长椅'
+                      : '选择空地，放置你的第一栋住宅'
                     : '已切换到探索模式',
                 );
               }}
@@ -201,6 +313,7 @@ export default function City() {
         </header>
         <section className="world-view" aria-label="青河市交互沙盒地图">
           <canvas
+            key={campusKind ?? 'city'}
             ref={canvasRef}
             className={`world-canvas ${tool !== 'explore' ? 'building-cursor' : ''}`}
             aria-label="立体像素城市。左键拖动旋转，右键拖动平移，滚轮缩放。Q/E 旋转，R/F 俯仰，WASD 移动。"
@@ -223,18 +336,25 @@ export default function City() {
           <aside className="city-overview panel">
             <div className="eyebrow">
               <span className="status-dot" />
-              城市概况<span className="live-tag">LIVE</span>
+              {campusMeta ? '校园概况' : '城市概况'}
+              <span className="live-tag">LIVE</span>
             </div>
             <div className="overview-title">
-              一座城市，
-              <br />
-              无数个小日常。
+              {campusMeta ? (
+                campusMeta.name
+              ) : (
+                <>
+                  一座城市，
+                  <br />
+                  无数个小日常。
+                </>
+              )}
             </div>
             <div className="city-stats">
               <div>
                 <Users size={15} />
                 <strong>{stats.population}</strong>
-                <span>居民</span>
+                <span>{campusMeta ? '学生' : '居民'}</span>
               </div>
               <div>
                 <Building2 size={15} />
@@ -251,19 +371,21 @@ export default function City() {
               <span className="soft-dot" />
               {paused
                 ? '时间已暂停'
-                : h < 7
-                  ? '城市正在醒来'
-                  : h < 17
-                    ? '街道上，人来人往'
-                    : h < 20
-                      ? '晚风吹过河畔'
-                      : '万家灯火，夜色温柔'}
+                : campusMeta
+                  ? '课间 · 校园活动中'
+                  : h < 7
+                    ? '城市正在醒来'
+                    : h < 17
+                      ? '街道上，人来人往'
+                      : h < 20
+                        ? '晚风吹过河畔'
+                        : '万家灯火，夜色温柔'}
             </div>
           </aside>
           <nav className="side-tools panel" aria-label="地图工具">
             <IconButton
-              label="城市全景 · 0"
-              onClick={() => engine.current?.focus()}
+              label={campusMeta ? '校园全景 · 0' : '城市全景 · 0'}
+              onClick={overview}
             >
               <Compass size={20} />
             </IconButton>
@@ -283,17 +405,24 @@ export default function City() {
             </IconButton>
             <IconButton
               label="向左旋转 · Q"
-              onClick={() => engine.current?.orbit(Math.PI / 8)}
+              onClick={() => rotate(Math.PI / 8)}
             >
               <RotateCcw size={20} />
             </IconButton>
             <IconButton
               label="向右旋转 · E"
-              onClick={() => engine.current?.orbit(-Math.PI / 8)}
+              onClick={() => rotate(-Math.PI / 8)}
             >
               <RotateCw size={20} />
             </IconButton>
             <div className="tool-divider" />
+            <IconButton
+              label={campusMeta ? '校园设施目录' : '学校目录'}
+              active={directory}
+              onClick={() => setDirectory(!directory)}
+            >
+              <School size={20} />
+            </IconButton>
             <IconButton
               label="操作指南"
               active={help}
@@ -382,12 +511,12 @@ export default function City() {
               </div>
             </div>
           )}
-          <aside className="right-stack">
+          <aside className={`right-stack ${directory ? 'directory-open' : ''}`}>
             <div className="minimap-panel panel">
               <div className="minimap-title">
                 <span>
                   <Navigation size={15} />
-                  城市缩略图
+                  {campusMeta ? '校园缩略图' : '城市缩略图'}
                 </span>
                 <span className="north">N ↑</span>
               </div>
@@ -400,62 +529,91 @@ export default function City() {
                 role="img"
               />
               <div className="minimap-foot">
-                <span>青河 · 镜头范围</span>
+                <span>{campusMeta ? campusMeta.name : '青河'} · 镜头范围</span>
                 <span>点击定位</span>
               </div>
             </div>
-            <div className="places-panel panel">
-              <div className="eyebrow">
-                城市里的学校<span>04</span>
-              </div>
-              {places.map((p, i) => (
-                <button
-                  className="place-item"
-                  key={p.name}
-                  onClick={() => focusPlace(p.name)}
-                >
-                  <span
-                    className="place-icon"
-                    style={{ color: p.color, background: p.color + '12' }}
+            {view === 'city' ? (
+              <div className="places-panel panel">
+                <div className="eyebrow">
+                  城市里的学校<span>04</span>
+                </div>
+                {places.map((p, i) => (
+                  <button
+                    className="place-item"
+                    key={p.name}
+                    onClick={() => focusPlace(p.name)}
                   >
-                    <p.icon size={19} />
-                  </span>
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>{p.sub}</small>
-                  </span>
-                  <span className="place-level">
-                    {['小学', '初中', '高中', '大学'][i]}
-                  </span>
-                  <ChevronRight size={13} />
-                </button>
-              ))}
-              <div className="places-footer">
-                <MapPin size={12} />
-                点击学校，近看立体校园
+                    <span
+                      className="place-icon"
+                      style={{ color: p.color, background: p.color + '12' }}
+                    >
+                      <p.icon size={19} />
+                    </span>
+                    <span>
+                      <strong>{p.name}</strong>
+                      <small>{p.sub}</small>
+                    </span>
+                    <span className="place-level">
+                      {['小学', '初中', '高中', '大学'][i]}
+                    </span>
+                    <ChevronRight size={13} />
+                  </button>
+                ))}
+                <div className="places-footer">
+                  <MapPin size={12} />
+                  点击学校，近看立体校园
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="places-panel panel campus-directory">
+                <div className="eyebrow">
+                  校园设施<span>{facilityList.length}</span>
+                </div>
+                <div className="facility-list">
+                  {facilityList.map((f) => (
+                    <button
+                      className="place-item"
+                      key={f.id}
+                      onClick={() => {
+                        schoolEngine.current?.focus(f);
+                        setDirectory(false);
+                      }}
+                    >
+                      <span className="place-icon" style={{ color: f.color }}>
+                        {f.type === 'building' ? (
+                          <Building2 size={18} />
+                        ) : (
+                          <MapPin size={18} />
+                        )}
+                      </span>
+                      <span>
+                        <strong>{f.name}</strong>
+                      </span>
+                      <ChevronRight size={13} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
           <div className="compass-mark">
             <span>N</span>
             <Navigation size={29} />
-            <span>青河 / QINGHE</span>
+            <span>{campusMeta ? campusMeta.name : '青河 / QINGHE'}</span>
           </div>
           <div className="zoom-controls panel">
-            <IconButton label="放大" onClick={() => engine.current?.zoom(1.2)}>
+            <IconButton label="放大" onClick={() => zoomView(1.2)}>
               <Plus size={19} />
             </IconButton>
             <span>{zoom}%</span>
-            <IconButton
-              label="缩小"
-              onClick={() => engine.current?.zoom(1 / 1.2)}
-            >
+            <IconButton label="缩小" onClick={() => zoomView(1 / 1.2)}>
               <Minus size={19} />
             </IconButton>
             <span className="zoom-divider" />
             <IconButton
-              label="适应城市全景"
-              onClick={() => engine.current?.focus()}
+              label={campusMeta ? '适应校园全景' : '适应城市全景'}
+              onClick={overview}
             >
               <Maximize size={16} />
             </IconButton>
@@ -468,15 +626,23 @@ export default function City() {
                 : tool === 'tree'
                   ? '点击空地种树 · 拖动旋转视角'
                   : tool === 'home'
-                    ? '点击空地建住宅 · 拖动旋转视角'
-                    : '点击移除你放置的房屋或树木'}
+                    ? campusMeta
+                      ? '点击空地放长椅 · 拖动旋转视角'
+                      : '点击空地建住宅 · 拖动旋转视角'
+                    : campusMeta
+                      ? '点击移除你放置的长椅或树木'
+                      : '点击移除你放置的房屋或树木'}
             </div>
             <div className="build-tools panel">
               {(
                 [
                   { id: 'explore', name: '探索', icon: MousePointer2 },
                   { id: 'tree', name: '种树', icon: TreePine },
-                  { id: 'home', name: '住宅', icon: Home },
+                  {
+                    id: 'home',
+                    name: campusMeta ? '长椅' : '住宅',
+                    icon: campusMeta ? Armchair : Home,
+                  },
                   { id: 'erase', name: '移除', icon: Trash2 },
                 ] as const
               ).map((t, i) => (
@@ -572,6 +738,16 @@ export default function City() {
               </SheetDescription>
             </SheetHeader>
             <div className="detail-content">
+              {selected && isSchoolKind(selected.kind) && (
+                <button
+                  className="detail-focus enter-campus"
+                  onClick={() => enterCampus(selected.kind as SchoolKind)}
+                >
+                  <DoorOpen size={19} />
+                  <span>进入校园</span>
+                  <ChevronRight size={17} />
+                </button>
+              )}
               <div className="detail-fact">
                 <Users size={18} />
                 <span>
@@ -612,6 +788,52 @@ export default function City() {
               <p className="detail-note">
                 城市中的居民与车辆沿街道实时移动。此处人数为场景设定，学校容量不计入常住人口。
               </p>
+            </div>
+          </SheetContent>
+        </Sheet>
+        <Sheet
+          open={!!facility}
+          onOpenChange={(open) => {
+            if (!open) setFacility(null);
+          }}
+        >
+          <SheetContent className="building-sheet facility-sheet">
+            <SheetHeader>
+              <div className="detail-icon">
+                <School size={34} />
+              </div>
+              <div className="eyebrow">{campusMeta?.name}</div>
+              <SheetTitle className="detail-title">{facility?.name}</SheetTitle>
+              <SheetDescription className="detail-description">
+                {facility?.description}
+              </SheetDescription>
+            </SheetHeader>
+            <div className="detail-content">
+              <h3 className="facility-heading">设施配置</h3>
+              <ul className="facility-rooms">
+                {facility?.rooms.map((room) => (
+                  <li key={room}>
+                    <Check size={15} />
+                    {room}
+                  </li>
+                ))}
+              </ul>
+              <button
+                className="detail-focus"
+                onClick={() => {
+                  if (facility) schoolEngine.current?.focus(facility);
+                  setFacility(null);
+                }}
+              >
+                <span>在校园中查看</span>
+                <Navigation size={17} />
+              </button>
+              <button
+                className="facility-return"
+                onClick={() => setFacility(null)}
+              >
+                继续漫游
+              </button>
             </div>
           </SheetContent>
         </Sheet>

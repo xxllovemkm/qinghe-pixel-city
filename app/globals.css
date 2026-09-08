@@ -1041,6 +1041,152 @@ kbd {
   height: 100%;
   pointer-events: none;
 }
+.return-city {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: #ebd4a0;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid #c6b88666;
+  border-radius: 5px;
+}
+.return-city:hover {
+  background: #e8d59d1a;
+}
+.enter-campus {
+  margin: 0 0 14px;
+  gap: 10px;
+}
+.enter-campus > span {
+  flex: 1;
+  text-align: left;
+}
+.building-sheet {
+  overflow-y: auto;
+}
+.facility-list {
+  max-height: min(365px, calc(100dvh - 450px));
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.campus-directory .place-item {
+  padding: 10px 0;
+  min-height: 42px;
+}
+.campus-directory .place-item strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.campus-directory .place-item > svg {
+  margin-left: auto;
+}
+.campus-directory {
+  padding-bottom: 12px;
+}
+.facility-heading {
+  font-size: 14px;
+  color: #e7d4a4;
+  margin: 0 0 12px;
+}
+.facility-rooms {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.facility-rooms li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #ffffff12;
+  color: #bbcbbc;
+}
+.facility-rooms svg {
+  color: #ddc58e;
+}
+.facility-return {
+  width: 100%;
+  padding: 14px;
+  margin-top: 8px;
+  color: #b5c6b5;
+  font-size: 14px;
+}
+.build-tool > span:last-child {
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .build-tool {
+    min-width: 64px;
+    padding: 12px 12px 9px;
+  }
+}
+.directory-open .places-panel {
+  display: block;
+}
+.campus-app .brand h1 {
+  letter-spacing: 0;
+}
+.campus-app .side-tools {
+  top: 268px;
+}
+.campus-app .layers-panel,
+.campus-app .help-panel {
+  top: 268px;
+}
+@media (max-height: 790px) {
+  .campus-app .side-tools {
+    top: 218px;
+  }
+}
+@media (max-width: 760px) {
+  .campus-app .brand h1 {
+    font-size: 17px;
+  }
+  .campus-app .topbar {
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .campus-app .brand-icon {
+    display: none;
+  }
+  .campus-app .top-actions {
+    gap: 5px;
+  }
+  .return-city {
+    font-size: 12px;
+    padding: 8px 7px;
+    gap: 4px;
+  }
+  .campus-app .side-tools {
+    top: 157px;
+  }
+  .campus-app .layers-panel,
+  .campus-app .help-panel {
+    top: 157px;
+  }
+  .directory-open .places-panel {
+    position: absolute;
+    right: 0;
+    top: 155px;
+    width: min(260px, calc(100vw - 90px));
+    z-index: 22;
+  }
+  .facility-list {
+    max-height: 260px;
+  }
+}
+@media (max-height: 650px) {
+  .campus-app .side-tools {
+    top: 157px;
+  }
+  .campus-app .layers-panel,
+  .campus-app .help-panel {
+    top: 205px;
+  }
+}
 .render-error {
   position: absolute;
   z-index: 30;
