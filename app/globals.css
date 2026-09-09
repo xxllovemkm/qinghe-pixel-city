@@ -283,6 +283,43 @@ p {
   align-items: center;
   gap: 7px;
 }
+.ai-live {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #c4d5be22;
+  color: #c5d3c1;
+}
+.ai-live-head,
+.ai-live-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-live-head {
+  color: #e5d7ac;
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+.ai-live-head b {
+  color: #f0c47f;
+  font-size: 12px;
+}
+.ai-live-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+}
+.ai-live-list small,
+.ai-live-source {
+  color: #8ca497;
+  font-size: 10px;
+}
+.ai-live-source {
+  display: block;
+  margin-top: 9px;
+}
 .soft-dot {
   width: 4px;
   height: 4px;
