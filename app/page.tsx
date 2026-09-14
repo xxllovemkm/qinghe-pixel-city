@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import SchoolDay from '@/components/school-day';
 import {
   Building2,
   RotateCcw,
@@ -65,23 +66,6 @@ import {
   type SchoolKind,
 } from '@/lib/world/school3d';
 
-type AiCampusStudent = {
-  student_id: string;
-  name?: string;
-  grade?: string;
-  stage?: string;
-  answered_right?: number;
-  observed_accuracy?: number | null;
-  interactions?: number;
-};
-type AiCampusRoster = {
-  available: boolean;
-  days?: number;
-  students?: AiCampusStudent[];
-};
-const AI_CAMPUS_API = (
-  process.env.NEXT_PUBLIC_AI_CAMPUS_API ?? 'http://127.0.0.1:8768'
-).replace(/\/$/, '');
 const places = [
   { name: '青禾小学', sub: '启蒙与成长', color: '#efb961', icon: School },
   { name: '明德初中', sub: '探索更大的世界', color: '#80b9d2', icon: School },
@@ -134,13 +118,17 @@ export default function City() {
     engine = useRef<City3DEngine | null>(null),
     schoolEngine = useRef<School3DEngine | null>(null);
   const [renderError, setRenderError] = useState('');
-  const [view, setView] = useState<'city' | 'school'>('city');
+  const [view, setView] = useState<'city' | 'school' | 'teaching'>('city');
+  const [routeRevision, setRouteRevision] = useState(0);
+  const [routeReady, setRouteReady] = useState(false);
   const [campusKind, setCampusKind] = useState<SchoolKind | null>(null);
   const [facility, setFacility] = useState<Facility | null>(null);
-  const [aiRoster, setAiRoster] = useState<AiCampusRoster | null>(null);
   const [directory, setDirectory] = useState(false);
   const campusCache = useRef<Partial<Record<SchoolKind, Campus>>>({});
   const savedCity = useRef<CitySnapshot | undefined>(undefined);
+  const saveCity = useCallback((snapshot: CitySnapshot) => {
+    savedCity.current = snapshot;
+  }, []);
   const [tool, setTool] = useState<Tool>('explore'),
     [paused, setPaused] = useState(false),
     [speed, setSpeed] = useState(1),
@@ -166,22 +154,37 @@ export default function City() {
     toastTimer.current = setTimeout(() => setToast(''), 3200);
   }, []);
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${AI_CAMPUS_API}/api/campus/roster`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        const roster = payload as AiCampusRoster | null;
-        if (roster?.available) setAiRoster(roster);
-      })
-      .catch(() => {
-        // The 3D city remains fully usable when the optional simulator is offline.
-      });
-    return () => controller.abort();
+    const restoreRoute = () => {
+      const params = new URLSearchParams(window.location.search);
+      const scene = params.get('view');
+      const campus = params.get('campus');
+      const kind = campus && isSchoolKind(campus) ? campus : 'primary';
+      if (scene === 'city') {
+        setCampusKind(null);
+        setView('city');
+      } else if (scene === 'campus') {
+        setCampusKind(kind);
+        setView('school');
+      } else if (
+        params.get('run') ||
+        params.get('teaching') === '1' ||
+        params.get('setup') === '1'
+      ) {
+        setCampusKind(kind);
+        setView('teaching');
+      } else {
+        setCampusKind(null);
+        setView('city');
+      }
+      setRouteRevision((revision) => revision + 1);
+      setRouteReady(true);
+    };
+    restoreRoute();
+    window.addEventListener('popstate', restoreRoute);
+    return () => window.removeEventListener('popstate', restoreRoute);
   }, []);
   useEffect(() => {
+    if (!routeReady || view === 'teaching') return;
     if (view === 'school' && campusKind) {
       try {
         const campus = (campusCache.current[campusKind] ??=
@@ -240,7 +243,7 @@ export default function City() {
       engine.current = null;
       clearTimeout(toastTimer.current);
     };
-  }, [announce, campusKind, view]);
+  }, [announce, campusKind, view, routeReady]);
   const focusPlace = (name: string) => {
     const b = engine.current?.world.buildings.find((b) => b.name === name);
     if (b) engine.current?.focus(b);
@@ -254,6 +257,10 @@ export default function City() {
       ? engine.current?.zoom(factor)
       : schoolEngine.current?.zoom(factor);
   const enterCampus = (kind: SchoolKind) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'campus');
+    url.searchParams.set('campus', kind);
+    window.history.pushState(null, '', url);
     clearTimeout(toastTimer.current);
     setToast('');
     setSelected(null);
@@ -267,6 +274,10 @@ export default function City() {
     setLayers(false);
   };
   const exitCampus = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'city');
+    url.searchParams.delete('campus');
+    window.history.pushState(null, '', url);
     setView('city');
     setCampusKind(null);
     setRenderError('');
@@ -276,25 +287,53 @@ export default function City() {
     setDirectory(false);
     announce('已返回青河市');
   };
+  const enterTeaching = () => {
+    setFacility(null);
+    setDirectory(false);
+    setView('teaching');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.delete('campus');
+    url.searchParams.delete('run');
+    url.searchParams.delete('student');
+    url.searchParams.set('teaching', '1');
+    url.searchParams.set('setup', '1');
+    window.history.pushState(null, '', url);
+  };
+  const exitTeaching = (kind?: SchoolKind) => {
+    setView('school');
+    setCampusKind(kind ?? 'primary');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('teaching');
+    url.searchParams.delete('setup');
+    url.searchParams.set('view', 'campus');
+    url.searchParams.set('campus', kind ?? 'primary');
+    window.history.pushState(null, '', url);
+  };
   const overview = () =>
     view === 'city' ? engine.current?.focus() : schoolEngine.current?.focus();
   const campusMeta = campusKind ? SCHOOL_META[campusKind] : null;
-  const aiStage = campusKind === 'primary'
-    ? 'primary'
-    : campusKind === 'middle'
-      ? 'junior'
-      : campusKind === 'high'
-        ? 'senior'
-        : null;
-  const aiStudents = aiStage
-    ? (aiRoster?.students ?? []).filter((student) => student.stage === aiStage)
-    : [];
   const facilityList = campusKind
     ? (campusCache.current[campusKind]?.facilities ?? [])
     : [];
   const h = Math.floor(clock / 60) % 24,
     m = clock % 60,
     isDark = night || h >= 19 || h < 6;
+  if (!routeReady)
+    return (
+      <main className="city-loading" aria-busy="true">
+        正在载入青河市…
+      </main>
+    );
+  if (view === 'teaching')
+    return (
+      <SchoolDay
+        key={routeRevision}
+        onExit={exitTeaching}
+        city={savedCity.current}
+        onCityChange={saveCity}
+      />
+    );
   return (
     <TooltipProvider delay={200}>
       <main
@@ -327,6 +366,13 @@ export default function City() {
             {campusMeta ? `规划容量 ${campusMeta.capacity} 人` : '种子 2417'}
           </div>
           <div className="top-actions">
+            <button
+              className="return-city school-day-entry"
+              onClick={enterTeaching}
+            >
+              <School size={17} />
+              <span>开始学校日</span>
+            </button>
             {view === 'school' && (
               <button className="return-city" onClick={exitCampus}>
                 <ArrowLeft size={17} />
@@ -412,24 +458,19 @@ export default function City() {
                 <span>树木</span>
               </div>
             </div>
-            {campusMeta && aiRoster?.available && (
-              <div className="ai-live" aria-label="AI校园模拟数据">
-                <div className="ai-live-head">
-                  <span>AI 校园动态</span>
-                  <b>{aiStudents.length} 人</b>
-                </div>
-                <div className="ai-live-list">
-                  {aiStudents.slice(0, 3).map((student) => (
-                    <div key={student.student_id}>
-                      <span>{student.name ?? student.student_id}</span>
-                      <small>{student.interactions ?? 0} 次互动</small>
-                    </div>
-                  ))}
-                  {!aiStudents.length && <small>暂无该学段模拟数据</small>}
-                </div>
-                <small className="ai-live-source">第 {aiRoster.days ?? '--'} 天 · 观察数据</small>
-              </div>
-            )}
+            <div className="campus-teaching-entry">
+              <span>学生的一天</span>
+              <p>
+                选择年级、人数和学习天数
+                <br />
+                跟随学生上学、上课和回家。
+              </p>
+              <button onClick={enterTeaching}>
+                <DoorOpen size={16} />
+                开始学校日
+                <ChevronRight size={15} />
+              </button>
+            </div>
             <div className="overview-foot">
               <span className="soft-dot" />
               {paused
@@ -872,6 +913,16 @@ export default function City() {
               </SheetDescription>
             </SheetHeader>
             <div className="detail-content">
+              {campusKind === 'primary' && facility?.id === 'teaching-b' && (
+                <button
+                  className="detail-focus enter-campus"
+                  onClick={enterTeaching}
+                >
+                  <DoorOpen size={18} />
+                  <span>进入教学楼</span>
+                  <ChevronRight size={16} />
+                </button>
+              )}
               <h3 className="facility-heading">设施配置</h3>
               <ul className="facility-rooms">
                 {facility?.rooms.map((room) => (

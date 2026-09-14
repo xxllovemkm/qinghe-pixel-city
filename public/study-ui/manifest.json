@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "hash_algorithm": "SHA-256",
+  "source": {
+    "project": "StudyMode",
+    "project_path_at_import": "/Users/xenoxu/Tencent/StudyMode",
+    "renderer": {
+      "path": "study_scene_demo/app.js",
+      "sha256": "b0c0359d3d72876b02b229140c8df4c2e1a6012fdc2853308e36e9ab66625542",
+      "sections": [
+        {
+          "first_line": 10,
+          "last_line": 10,
+          "sha256": "2e53abefcb33159a3cbfda54ceb90616ee127132439440b6e251bdf53f9284ab"
+        },
+        {
+          "first_line": 27,
+          "last_line": 140,
+          "sha256": "4a3f4008e2ef540f2355b4a466cfff4133af2d889e6388b03d37bef44ff250d6"
+        }
+      ]
+    },
+    "vendor_manifest": {
+      "path": "study_scene_demo/vendor/manifest.json",
+      "sha256": "770dd5bf2783c159f0307bd01742fba8e7ee541ed9936afb6c22a52ca06e552f"
+    }
+  },
+  "delivery": {
+    "renderer": {
+      "path": "markdown.js",
+      "sha256": "eb1838723b8d5906fe3e84b0e92b29a204cda90667dfa75ef03cef81506ddadf",
+      "features": [
+        "Markdown 正文",
+        "KaTeX 行内与块级公式",
+        "DOMPurify 清理",
+        "正文填空横线"
+      ]
+    },
+    "vendor_manifest": {
+      "path": "vendor/manifest.json",
+      "sha256": "770dd5bf2783c159f0307bd01742fba8e7ee541ed9936afb6c22a52ca06e552f",
+      "file_count": 67,
+      "file_hashes": "package entries: files[path]"
+    }
+  }
+}

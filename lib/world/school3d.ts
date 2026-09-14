@@ -7,16 +7,13 @@ import {
   CAMPUS_DIRECTION,
   campusDistance,
 } from './school-geometry';
-import {
-  editCampus,
-  SCHOOL_META,
-  type Campus,
-  type Facility,
-} from './school-model';
+import { editCampus, type Campus, type Facility } from './school-model';
 import type { ViewOptions } from './scene3d';
 import type { Tool } from './model';
+import { createDayActors, type DayActorSource } from './day-actors3d';
 export { SCHOOL_META, type SchoolKind } from './school-model';
 type Setup = {
+  dayActors?: DayActorSource;
   canvas: HTMLCanvasElement;
   mini: HTMLCanvasElement;
   overlay: HTMLCanvasElement;
@@ -53,6 +50,9 @@ export function createSchool3D(config: Setup) {
     day = new THREE.Color('#b7cec8'),
     night = new THREE.Color('#1d2e40');
   scene.background = day.clone();
+  const dayActors = config.dayActors
+    ? createDayActors(scene, 'campus', config.dayActors)
+    : null;
   const camera = new THREE.PerspectiveCamera(38, 1, 1, 2000);
   let baseDistance = 260;
   camera.position.copy(CAMPUS_DIRECTION).multiplyScalar(baseDistance);
@@ -347,6 +347,7 @@ export function createSchool3D(config: Setup) {
     down = null;
     const p = ray(e),
       tool = config.options().tool;
+    if (dayActors?.pick(raycaster)) return;
     const hit = raycaster.intersectObjects(geometry.root.children, false)[0];
     const id =
       hit?.instanceId !== undefined
@@ -557,11 +558,13 @@ export function createSchool3D(config: Setup) {
     const dt = Math.min((now - last) / 1000, 0.06);
     last = now;
     const opts = config.options();
+    if (config.dayActors) campus.time = config.dayActors.simTime();
     if (!opts.paused) {
       campus.elapsed += dt * opts.speed;
-      campus.time += dt * opts.speed * 2;
+      if (!config.dayActors) campus.time += dt * opts.speed * 2;
       updateStudents();
     }
+    dayActors?.update(dt, now / 1000);
     const hour = (campus.time / 60) % 24,
       dark = opts.night
         ? 1
@@ -602,6 +605,7 @@ export function createSchool3D(config: Setup) {
     camera.updateMatrixWorld();
     renderer.render(scene, camera);
     labels();
+    dayActors?.labels(oc, camera, width, height);
     uiTimer += dt;
     if (uiTimer > 0.2) {
       drawMini();
@@ -630,6 +634,17 @@ export function createSchool3D(config: Setup) {
     zoom,
     orbit,
     edit,
+    focusStudent: (id: string) => {
+      const p = dayActors?.position(id);
+      if (p) {
+        const offset = camera.position.clone().sub(controls.target);
+        controls.target.copy(p);
+        camera.position
+          .copy(p)
+          .add(offset.setLength(Math.min(80, offset.length())));
+        controls.update();
+      }
+    },
     dispose: () => {
       disposed = true;
       cancelAnimationFrame(raf);
@@ -638,6 +653,7 @@ export function createSchool3D(config: Setup) {
       mini.removeEventListener('pointerdown', miniClick);
       window.removeEventListener('keydown', key);
       controls.dispose();
+      dayActors?.dispose();
       disposeSchoolGeometry(geometry.root);
       actors.geometry.dispose();
       (actors.material as THREE.Material).dispose();

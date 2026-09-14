@@ -8,9 +8,16 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
-    "start": "wrangler dev --config dist/server/wrangler.json",
+    "build:staging": "CLOUDFLARE_ENV=staging vinext build",
+    "build:production": "CLOUDFLARE_ENV=production vinext build",
+    "start": "wrangler dev --config dist/server/wrangler.json --env ''",
+    "cf:typegen": "wrangler types --config wrangler.jsonc --include-runtime=false",
+    "deploy:check": "npm run build:production && wrangler deploy --config dist/server/wrangler.json --env '' --dry-run",
+    "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json --env ''",
+    "deploy": "npm run build:production && wrangler deploy --config dist/server/wrangler.json --env ''",
     "lint": "oxlint",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "education:dev": "node scripts/education-dev.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

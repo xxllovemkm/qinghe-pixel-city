@@ -1,0 +1,651 @@
+.knowledge3d {
+  --graph-ink: #27483e;
+  --graph-muted: #81917c;
+  color: var(--graph-ink);
+  background: #fbfcf6;
+  border: 1px solid #dce4d5;
+  border-radius: 12px;
+  margin: 18px 0;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.knowledge3d button,
+.knowledge3d input,
+.knowledge3d select {
+  font: inherit;
+}
+.knowledge3d button {
+  cursor: pointer;
+}
+.knowledge3d button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.knowledge3d button:focus-visible,
+.knowledge3d input:focus-visible,
+.knowledge3d select:focus-visible,
+.knowledge3d canvas:focus-visible {
+  outline: 2px solid #b79757;
+  outline-offset: 2px;
+}
+.knowledge3d-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 17px 16px 14px;
+}
+.knowledge3d-heading > div > span {
+  font-size: 8px;
+  letter-spacing: 1.7px;
+  color: #829b77;
+  font-weight: 600;
+}
+.knowledge3d-heading h3 {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.knowledge3d-heading h3 small {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--graph-muted);
+}
+.knowledge3d-expand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid #dae3d1;
+  border-radius: 6px;
+  font-size: 10px !important;
+  background: #f6f8ef;
+  color: #55724a;
+  white-space: nowrap;
+}
+.knowledge3d-toolbar {
+  display: flex;
+  gap: 7px;
+  padding: 0 12px 12px;
+}
+.knowledge3d-relation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 0 14px 10px;
+  color: #607867;
+  font-size: 10px;
+}
+.knowledge3d-relation-legend span { display: flex; align-items: center; gap: 5px; }
+.knowledge3d-relation-legend i { display: inline-block; width: 20px; border-top: 2px solid #668d71; }
+.knowledge3d-relation-legend .relation-contains { border-top: 2px dotted #b29a74; }
+.knowledge3d-relation-legend .relation-sequence { border-top: 2px dashed #7396b5; }
+.knowledge3d-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #dde4d6;
+  border-radius: 6px;
+  background: #fffef9;
+  flex: 1;
+  min-width: 0;
+  color: #8b9d7c;
+  position: relative;
+}
+.knowledge3d-search > svg,
+.knowledge3d-search > button {
+  flex-shrink: 0;
+}
+.knowledge3d-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--graph-ink);
+  background: transparent;
+  font-size: 10px;
+}
+.knowledge3d-search input::placeholder {
+  color: #9aa590;
+}
+.knowledge3d-search > button {
+  border: 0;
+  background: transparent;
+  color: #859978;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.knowledge3d-toolbar > select {
+  width: 90px;
+  border: 1px solid #dde4d6;
+  border-radius: 6px;
+  background: #f5f7ef;
+  padding: 5px 4px;
+  color: #617859;
+  font-size: 10px;
+}
+.knowledge3d-search-results {
+  position: absolute;
+  left: -1px;
+  top: calc(100% + 5px);
+  width: max(100%, 230px);
+  max-width: min(450px, 85vw);
+  max-height: 285px;
+  overflow: auto;
+  z-index: 15;
+  border: 1px solid #d5dfca;
+  border-radius: 7px;
+  background: #fffef9;
+  box-shadow: 0 7px 28px #344b3520;
+}
+.knowledge3d-search-results > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid #e9ede2;
+  background: transparent;
+  text-align: left;
+  line-height: 1.7;
+}
+.knowledge3d-search-results > button:hover {
+  background: #edf3e5;
+}
+.knowledge3d-search-results strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--graph-ink);
+}
+.knowledge3d-search-results span {
+  white-space: nowrap;
+  font-size: 9px;
+  color: var(--graph-muted);
+}
+.knowledge3d-search-results p {
+  padding: 10px 12px;
+  font-size: 11px;
+}
+.knowledge3d-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.knowledge3d-map {
+  position: relative;
+  height: 340px;
+  background: #edf1e8;
+  overflow: hidden;
+  border-block: 1px solid #dfe6d9;
+}
+.knowledge3d-map > canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+.knowledge3d-map > canvas:active {
+  cursor: grabbing;
+}
+.knowledge3d-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.knowledge3d-node-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+  border: 1px solid #f8faf0b8;
+  background: #f9fbf0e8;
+  padding: 3px 6px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px #415d3520;
+  color: #536d48;
+  font-size: 10px !important;
+  white-space: nowrap;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.knowledge3d-node-label[hidden] {
+  display: none;
+}
+.knowledge3d-node-label[data-selected='true'] {
+  z-index: 2;
+  background: #31594d;
+  color: #fffdf0;
+  border-color: #31594d;
+}
+.knowledge3d-map-stats {
+  display: flex;
+  gap: 10px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: #8b9b80;
+  font-size: 9px;
+  pointer-events: none;
+}
+.knowledge3d-map-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  display: flex;
+  border: 1px solid #fffefa;
+  border-radius: 7px;
+  padding: 3px;
+  background: #fcfdf6e8;
+  box-shadow: 0 3px 14px #576b4220;
+}
+.knowledge3d-map-controls button {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: #4e6b44;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 4px;
+}
+.knowledge3d-map-controls button:hover {
+  background: #e1e9d6;
+}
+.knowledge3d-map-hint {
+  position: absolute;
+  left: 11px;
+  bottom: 12px;
+  color: #8d9c80;
+  font-size: 8px;
+  pointer-events: none;
+  line-height: 1.8;
+}
+.knowledge3d-map-hint small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+}
+.knowledge3d-map-message {
+  position: absolute;
+  inset: 45px 15px 60px;
+  display: grid;
+  place-items: center;
+  color: #7f9673;
+  text-align: center;
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.knowledge3d-detail {
+  max-height: 340px;
+  overflow: auto;
+  padding: 15px;
+  scrollbar-width: thin;
+  scrollbar-color: #ccd7bf transparent;
+}
+.knowledge3d-detail-title {
+  position: relative;
+  padding-right: 24px;
+}
+.knowledge3d-detail-title > span {
+  color: #94a186;
+  font-size: 9px;
+}
+.knowledge3d-detail-title > button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--graph-muted);
+}
+.knowledge3d-detail-title h4 {
+  margin: 5px 0 13px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.8;
+}
+.knowledge3d-node-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #eef3e5;
+  padding: 10px 11px;
+  border-radius: 6px;
+}
+.knowledge3d-node-progress > span:first-child {
+  font-size: 10px;
+  color: #758b69;
+}
+.knowledge3d-node-progress strong {
+  color: #45653b;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.knowledge3d-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  color: #c9d3bc;
+}
+.knowledge3d-stars svg[data-lit='true'] {
+  fill: #e5c17a;
+  color: #b58f48;
+}
+.knowledge3d-stars > span {
+  margin-left: 3px;
+  color: #8d8d6b;
+  font-size: 9px;
+}
+.knowledge3d-unknown {
+  color: #89997b;
+  font-size: 11px;
+}
+.knowledge3d-note {
+  color: #8e9e80;
+  line-height: 1.9;
+  font-size: 10px;
+  margin: 9px 0;
+}
+.knowledge3d-detail-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e6ebdf;
+}
+.knowledge3d-detail-section h5 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.knowledge3d-scope {
+  margin: 9px 0;
+  padding: 10px 11px;
+  border-radius: 6px;
+  background: #f2f5ec;
+}
+.knowledge3d-scope > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+.knowledge3d-scope strong {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.8;
+}
+.knowledge3d-scope p,
+.knowledge3d-plan p {
+  font-size: 10px;
+  line-height: 1.9;
+  color: #7d906f;
+  margin: 7px 0;
+}
+.knowledge3d-value {
+  color: #5a794d;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.knowledge3d-scope .knowledge3d-stars svg {
+  width: 12px;
+  height: 12px;
+}
+.knowledge3d-scope > small {
+  display: block;
+  margin-top: 9px;
+  color: #9aa58d;
+  font-size: 9px;
+}
+.knowledge3d-evidence {
+  display: flex;
+  gap: 6px 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.knowledge3d-evidence button {
+  color: #728b5e;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 9px;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.knowledge3d-evidence span {
+  color: #97a28a;
+  font-size: 9px;
+}
+.knowledge3d-path {
+  margin: 10px 0;
+}
+.knowledge3d-path > span {
+  display: block;
+  font-size: 9px;
+  color: #96a489;
+  margin-bottom: 5px;
+}
+.knowledge3d-path button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: #628051;
+  font-size: 10px;
+  text-align: left;
+  line-height: 1.8;
+}
+.knowledge3d-path button svg {
+  flex-shrink: 0;
+}
+.knowledge3d-plan {
+  padding: 9px 10px;
+  margin: 8px 0;
+  border-left: 2px solid #c5ad71;
+  background: #f7f5e9;
+}
+.knowledge3d-plan > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+}
+.knowledge3d-plan strong {
+  font-weight: 500;
+}
+.knowledge3d-plan span {
+  color: #9e966f;
+}
+.knowledge3d-detail-empty {
+  padding: 8px 2px;
+  color: #9da992;
+}
+.knowledge3d-detail-empty h4 {
+  color: #708661;
+  font-weight: 500;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.knowledge3d-detail-empty p,
+.knowledge3d-detail-empty small {
+  font-size: 10px;
+  line-height: 1.9;
+  margin: 5px 0;
+}
+.knowledge3d-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 11px;
+  align-items: center;
+  padding: 10px 13px;
+  border-top: 1px solid #e3e9dc;
+  color: #9aa98b;
+  font-size: 8px;
+}
+.knowledge3d-footer > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.knowledge3d-footer i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9db481;
+}
+.knowledge3d-footer > small {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-size: 8px;
+  color: #b0b9a4;
+}
+.knowledge3d-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #213e346b;
+  backdrop-filter: blur(7px);
+  padding: 24px;
+}
+.knowledge3d-expanded {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 90px #1e372c4a;
+}
+.knowledge3d-expanded .knowledge3d-heading {
+  padding: 19px 24px 15px;
+}
+.knowledge3d-expanded .knowledge3d-heading h3 {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 19px;
+}
+.knowledge3d-expanded .knowledge3d-toolbar {
+  padding: 0 24px 17px;
+  max-width: 660px;
+  width: 100%;
+}
+.knowledge3d-expanded .knowledge3d-workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+.knowledge3d-expanded .knowledge3d-map {
+  height: 100%;
+  min-height: 0;
+  border-bottom: 0;
+}
+.knowledge3d-expanded .knowledge3d-detail {
+  max-height: none;
+  padding: 23px;
+  border-left: 1px solid #dfe5d8;
+  border-top: 1px solid #dfe5d8;
+}
+.knowledge3d-expanded .knowledge3d-map-stats {
+  top: 20px;
+  left: 24px;
+  font-size: 10px;
+}
+.knowledge3d-expanded .knowledge3d-map-controls {
+  right: 20px;
+  bottom: 20px;
+}
+.knowledge3d-expanded .knowledge3d-map-hint {
+  bottom: 20px;
+  left: 24px;
+  font-size: 9px;
+}
+.knowledge3d-expanded .knowledge3d-footer > small {
+  width: auto;
+  margin-left: auto;
+  max-width: 50%;
+}
+@media (max-width: 760px) {
+  .knowledge3d-backdrop {
+    padding: 8px;
+  }
+  .knowledge3d-expanded .knowledge3d-heading {
+    padding: 16px;
+  }
+  .knowledge3d-expanded .knowledge3d-heading h3 {
+    flex-direction: column;
+    gap: 3px;
+    font-size: 16px;
+  }
+  .knowledge3d-expanded .knowledge3d-toolbar {
+    padding: 0 12px 12px;
+  }
+  .knowledge3d-expanded .knowledge3d-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .knowledge3d-expanded .knowledge3d-map {
+    flex: 1;
+    min-height: 250px;
+  }
+  .knowledge3d-expanded .knowledge3d-detail {
+    flex: 0 1 235px;
+    max-height: 235px;
+    padding: 14px;
+    border-left: 0;
+  }
+  .knowledge3d-expanded .knowledge3d-map-stats {
+    top: 12px;
+    left: 12px;
+    font-size: 8px;
+  }
+  .knowledge3d-expanded .knowledge3d-map-controls {
+    bottom: 12px;
+    right: 10px;
+  }
+  .knowledge3d-expanded .knowledge3d-map-hint {
+    bottom: 12px;
+    left: 10px;
+    font-size: 8px;
+  }
+  .knowledge3d-expanded .knowledge3d-footer > small {
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+
+.public-knowledge-atlas { margin-top: 18px; padding: 12px; border-top: 1px solid #d0d8c8; }
+.public-knowledge-atlas > summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.public-knowledge-atlas > input { width: 100%; margin: 10px 0; padding: 9px; border: 1px solid #c8d1c0; border-radius: 8px; font-size: 12px; }
+.knowledge3d-public-results { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.knowledge3d-public-results button { border: 1px solid #c8d1c0; border-radius: 6px; padding: 5px 7px; background: white; font-size: 11px; cursor: pointer; }
+.knowledge3d-node-label[data-evidence-kind=inferred] { border-color: #a780b5; }
+.knowledge3d-node-label[data-evidence-kind=hypothesis] { border-color: #c79450; border-style: dashed; }

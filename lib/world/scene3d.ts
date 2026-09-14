@@ -23,6 +23,7 @@ import {
   overviewDistance,
 } from './geometry3d';
 import { registerCityTools } from './agent-tools';
+import { createDayActors, type DayActorSource } from './day-actors3d';
 export type ViewOptions = {
   tool: Tool;
   paused: boolean;
@@ -32,6 +33,7 @@ export type ViewOptions = {
   night: boolean;
 };
 type Setup = {
+  dayActors?: DayActorSource;
   saved?: CitySnapshot;
   canvas: HTMLCanvasElement;
   mini: HTMLCanvasElement;
@@ -130,6 +132,9 @@ export function createCity3D(config: Setup) {
   scene.add(city.root);
   const agents = createAgentMeshes(world);
   scene.add(agents.mesh);
+  const dayActors = config.dayActors
+    ? createDayActors(scene, 'city', config.dayActors)
+    : null;
   const miniCache = document.createElement('canvas');
   miniCache.width = W;
   miniCache.height = H;
@@ -317,6 +322,7 @@ export function createCity3D(config: Setup) {
     }
     downPoint = null;
     ray(e);
+    if (dayActors?.pick(raycaster)) return;
     const p = groundPoint();
     const hits = raycaster.intersectObjects([city.solids, city.windows], false);
     const first = hits[0];
@@ -546,12 +552,14 @@ export function createCity3D(config: Setup) {
     const dt = Math.min((now - last) / 1000, 0.06);
     last = now;
     const opts = config.options();
+    if (config.dayActors) time = config.dayActors.simTime();
     if (!opts.paused) {
       elapsed += dt * opts.speed;
-      time += dt * opts.speed * 2;
+      if (!config.dayActors) time += dt * opts.speed * 2;
       updateAgents(world, dt * opts.speed);
       agents.update(elapsed);
     }
+    dayActors?.update(dt, now / 1000);
     controls.update();
     camera.updateMatrixWorld();
     const hour = (time / 60) % 24,
@@ -600,6 +608,7 @@ export function createCity3D(config: Setup) {
     canvas.dataset.scene = 'city';
     canvas.dataset.ready = 'true';
     drawLabels(opts.labels);
+    dayActors?.labels(oc, camera, width, height);
     miniTime += dt;
     uiTime += dt;
     if (miniTime > 0.12) {
@@ -627,6 +636,17 @@ export function createCity3D(config: Setup) {
     orbit,
     refresh,
     edit,
+    focusStudent: (id: string) => {
+      const p = dayActors?.position(id);
+      if (p) {
+        const offset = camera.position.clone().sub(controls.target);
+        controls.target.copy(p);
+        camera.position
+          .copy(p)
+          .add(offset.setLength(Math.min(95, offset.length())));
+        controls.update();
+      }
+    },
     snapshot: (): CitySnapshot => ({
       world,
       time,
@@ -645,6 +665,7 @@ export function createCity3D(config: Setup) {
       controls.dispose();
       disposeGeometry(city);
       agents.dispose();
+      dayActors?.dispose();
       texture.dispose();
       ghost.geometry.dispose();
       ghostMaterial.dispose();

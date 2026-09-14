@@ -28,6 +28,7 @@ yarn-error.log*
 
 # local environment
 .env*
+.dev.vars*
 
 # deployment and generated files
 .vercel
@@ -36,6 +37,11 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/worker-configuration.d.ts
 
 # TypeScript incremental cache
 *.tsbuildinfo
+
+/.venv-education/
+/tmp/
+__pycache__/
